@@ -1,6 +1,8 @@
-import {Add, Dec, Inc} from "./arith";
+import {Add} from "./arith";
 
-export type TupLen<A extends unknown[]> = A["length"];
+export type TupLen<A extends unknown[]> = A["length"] extends number ?
+  A["length"]
+  : -1
 
 export type N<Value extends number> = MkTup<Value>
 
@@ -42,8 +44,6 @@ export type SplitAt<
       Tail<List>,
       Index,
       Numeric<Add<CurrIndex, 1>>,
-      [...Acc, Index]
+      [...Acc, Head<List>]
     > 
 
-type __ = SplitAt<[1, 4, 3], 1>
-      

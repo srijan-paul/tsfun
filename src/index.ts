@@ -2,6 +2,7 @@ import { AsNum, Dec, Inc } from "./arith";
 import { Head, SplitAt, Tail } from "./util";
 
 type Tape = [number, number, number];
+type ZeroedTape = [0, 0, 0];
 
 type State = {
   tape: Tape;
@@ -16,9 +17,9 @@ type IncAt<_Tape extends Tape, Index extends number> = SplitAt<
   ? L extends number[]
     ? R extends number[]
       ? [...L, Inc<AsNum<Head<R>>>, ...Tail<R>]
-      : 0
-    : 0
-  : 0;
+      : ZeroedTape 
+    : ZeroedTape 
+  : ZeroedTape;
 
 type DecAt<_Tape extends Tape, Index extends number> = SplitAt<
   _Tape,
@@ -27,11 +28,11 @@ type DecAt<_Tape extends Tape, Index extends number> = SplitAt<
   ? L extends number[]
     ? R extends number[]
       ? [...L, Dec<AsNum<Head<R>>>, ...Tail<R>]
-      : 0
-    : 0
-  : 0;
+      : ZeroedTape
+    : ZeroedTape
+  : ZeroedTape;
 
-type Instruction = "+" | "-" | ">" | "<" | "[" | "]";
+type Instruction = "+" | "-" | ">" | "<" | "[" | "]" | ".";
 
 type Increment<S extends State> = {
   tape: IncAt<S["tape"], S["ptr"]>;
@@ -63,12 +64,24 @@ type Log<S extends State> = {
   output: `${S["output"]}${S["tape"][S["ptr"]]}`;
 }
 
-export type Eval<S extends State, Instr extends Instruction> =
+export type Step<S extends State, Instr extends Instruction> =
   Instr extends "+" ? Increment<S> :
   Instr extends "-" ? Decrement<S> :
   Instr extends ">" ? MoveRight<S> :
   Instr extends "." ? Log<S>       :
-  Instr extends "<" ? MoveLeft<S>  : never;
+  Instr extends "<" ? MoveLeft<S>  : S;
 
-type nextstate = Eval<{ tape: [2, 0, 0]; ptr: 0; output: "" }, "-">;
+type StartState = {
+  tape: [0, 0, 0],
+  ptr: 0,
+  output: ''
+}
+
+export type Interpret<Code extends string, S extends State = StartState> =
+  Code extends `${infer Instr extends Instruction}${infer Rest extends string}`
+  // @ts-ignore: TS thinks this call is "possibly infinite". But I'll just ignore this :^)
+  ? Interpret<Rest, Step<S, Instr>>
+  : S;
+
+export type _$ = Interpret<"++++++.">
 
