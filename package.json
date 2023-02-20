@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "@types/node": "^18.13.0",
+    "ts-node": "^10.9.1",
+    "tslib": "^2.5.0"
+  },
+  "name": "tsfun",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^4.9.5"
+  }
+}
