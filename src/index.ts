@@ -4,12 +4,6 @@ import { Head, SplitAt, Tail } from "./util";
 type Tape = [number, number, number];
 type ZeroedTape = [0, 0, 0];
 
-type State = {
-  tape: Tape;
-  ptr: number;
-  output: string;
-};
-
 type IncAt<_Tape extends Tape, Index extends number> = SplitAt<
   _Tape,
   Index
@@ -17,8 +11,8 @@ type IncAt<_Tape extends Tape, Index extends number> = SplitAt<
   ? L extends number[]
     ? R extends number[]
       ? [...L, Inc<AsNum<Head<R>>>, ...Tail<R>]
-      : ZeroedTape 
-    : ZeroedTape 
+      : ZeroedTape
+    : ZeroedTape
   : ZeroedTape;
 
 type DecAt<_Tape extends Tape, Index extends number> = SplitAt<
@@ -34,54 +28,130 @@ type DecAt<_Tape extends Tape, Index extends number> = SplitAt<
 
 type Instruction = "+" | "-" | ">" | "<" | "[" | "]" | ".";
 
+type State = {
+  // The memory tape
+  tape: Tape;
+
+  // An index into the memory tape
+  dataPtr: number;
+
+  // An index into the source code.
+  // This always points to the current instruction
+  // being executed.
+  codePtr: number;
+
+  // Anything printed by the "." command is appended here.
+  output: string;
+
+  // To keep track of nested loops.
+  loopStack: number[];
+};
+
+type Next<S extends State> = {
+  codePtr: Inc<S["codePtr"]>;
+} & Omit<S, "codePtr">;
+
 type Increment<S extends State> = {
-  tape: IncAt<S["tape"], S["ptr"]>;
-  ptr: S["ptr"];
-  output: S["output"];
-};
-
-type MoveRight<S extends State> = {
-  tape: S["tape"];
-  ptr: Inc<S["ptr"]>;
-  output: S["output"];
-};
-
-type MoveLeft<S extends State> = {
-  tape: S["tape"];
-  ptr: Dec<S["ptr"]>;
-  output: S["output"];
-};
+  tape: IncAt<S["tape"], S["dataPtr"]>;
+} & Omit<Next<S>, "tape">;
 
 type Decrement<S extends State> = {
-  tape: DecAt<S["tape"], S["ptr"]>;
-  ptr: S["ptr"];
-  output: S["output"];
+  tape: DecAt<S["tape"], S["dataPtr"]>;
+} & Omit<Next<S>, "tape">;
+
+type MoveRight<S extends State> = {
+  dataPtr: Inc<S["dataPtr"]>;
+} & Omit<Next<S>, "dataPtr">;
+
+type MoveLeft<S extends State> = {
+  dataPtr: Dec<S["dataPtr"]>;
+} & Omit<Next<S>, "dataPtr">;
+
+type Print<S extends State> = {
+  tape: S["tape"];
+  dataPtr: S["dataPtr"];
+  output: `${S["output"]}${S["tape"][S["dataPtr"]]}`;
+  loopStack: S["loopStack"];
+  codePtr: Inc<S["codePtr"]>;
 };
 
-type Log<S extends State> = {
-  tape: DecAt<S["tape"], S["ptr"]>;
-  ptr: S["ptr"];
-  output: `${S["output"]}${S["tape"][S["ptr"]]}`;
-}
+type StartLoop<S extends State> = {
+  tape: S["tape"];
+  dataPtr: S["dataPtr"];
+  output: S["output"];
+  codePtr: Inc<S["codePtr"]>;
+  loopStack: [S["codePtr"], ...S["loopStack"]];
+};
 
-export type Step<S extends State, Instr extends Instruction> =
+type ReadTape<S extends State> = S["tape"][S["dataPtr"]];
+
+type EndLoop<S extends State> = {
+  tape: S["tape"];
+  dataPtr: S["dataPtr"];
+  output: S["output"];
+  codePtr: ReadTape<S> extends 0 
+      ? Inc<S["codePtr"]>
+      : Head<S["loopStack"]>;
+  loopStack: ReadTape<S> extends 0
+    ? Tail<S["loopStack"]>
+    : S["loopStack"];
+};
+
+// prettier-ignore
+export type Step<S extends State, Instr extends Instruction> = 
   Instr extends "+" ? Increment<S> :
   Instr extends "-" ? Decrement<S> :
   Instr extends ">" ? MoveRight<S> :
-  Instr extends "." ? Log<S>       :
-  Instr extends "<" ? MoveLeft<S>  : S;
+  Instr extends "<" ? MoveLeft<S>  :
+  Instr extends "." ? Print<S>     :
+  Instr extends "[" ? StartLoop<S> : 
+  Instr extends "]" ? EndLoop<S>   : 
+  Next<S>;
 
 type StartState = {
-  tape: [0, 0, 0],
-  ptr: 0,
-  output: ''
-}
+  tape: [0, 0, 0];
+  dataPtr: 0;
+  output: "";
+  codePtr: 0;
+  loopStack: [];
+};
 
-export type Interpret<Code extends string, S extends State = StartState> =
-  Code extends `${infer Instr extends Instruction}${infer Rest extends string}`
-  // @ts-ignore: TS thinks this call is "possibly infinite". But I'll just ignore this :^)
-  ? Interpret<Rest, Step<S, Instr>>
+type StrSplice<Str extends string,
+  Index extends number,
+  CurrIndex extends number = 0> =
+  Str extends `${infer _Char}${infer Rest}`
+  ? CurrIndex extends Index
+    ? Rest 
+    : StrSplice<Rest, Index, Inc<CurrIndex>>
+  : "";
+
+type Interpret2<
+  Code extends string,
+  S extends State = StartState,
+  FullCode extends string = Code
+> =
+  Code extends `+${infer Rest}` ? Interpret2<Rest, Increment<S>> : 
+  Code extends `-${infer Rest}` ? Interpret2<Rest, Decrement<S>> :
+  Code extends `>${infer Rest}` ? Interpret2<Rest, MoveRight<S>> :
+  Code extends `<${infer Rest}` ? Interpret2<Rest, MoveRight<S>> :
+  Code extends `.${infer Rest}` ? Interpret2<Rest, Print<S>>     :
+  Code extends `[${infer Rest}` ? Interpret2<Rest, StartLoop<S>> :
+  Code extends `]${infer Rest}` ? 
+    S["dataPtr"] extends 0 
+      ? Head<S["loopStack"]> extends infer OldPtr extends number
+         ? Interpret2<StrSplice<FullCode, OldPtr>, Omit<S, "codePtr"> & { codePtr: Inc<OldPtr> }>
+         : "Encountered an error"
+
+      : Interpret2<Rest, Omit<Next<S>, "loopStack"> & { loopStack: Tail<S["loopStack"]> }> 
   : S;
 
-export type _$ = Interpret<"++++++.">
+export type Interpret<
+  Code extends string,
+  tape extends Tape = ZeroedTape
+> = Interpret2<
+  Code,
+  { tape: tape; dataPtr: 0; output: ""; loopStack: []; codePtr: 0 }
+>;
+
+export type _$ = Interpret<"+++++++.>+++.[-].">;
 
