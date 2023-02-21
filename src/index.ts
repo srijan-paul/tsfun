@@ -4,6 +4,13 @@ import { Head, SplitAt, Tail } from "./util";
 type Tape = [number, number, number];
 type ZeroedTape = [0, 0, 0];
 
+
+// Increment the value at [Index] in [_Tape] by 1.
+// Algorithm:
+// Say the tape is [1, 2, 3], and we want to increment index 1.
+// First, we split the tape into two parts like so:
+// [[1], [2, 3]. Say L = [1], R = [2, 3]
+// Then, we take take concatenate: L + [Head(R) + 1] + Rest(R)
 type IncAt<_Tape extends Tape, Index extends number> = SplitAt<
   _Tape,
   Index
@@ -15,6 +22,9 @@ type IncAt<_Tape extends Tape, Index extends number> = SplitAt<
     : ZeroedTape
   : ZeroedTape;
 
+
+// Decrement the value at [Index] in [_Tape] by 1.
+// Works just like "Increment".
 type DecAt<_Tape extends Tape, Index extends number> = SplitAt<
   _Tape,
   Index
@@ -97,17 +107,6 @@ type EndLoop<S extends State> = {
     : S["loopStack"];
 };
 
-// prettier-ignore
-export type Step<S extends State, Instr extends Instruction> = 
-  Instr extends "+" ? Increment<S> :
-  Instr extends "-" ? Decrement<S> :
-  Instr extends ">" ? MoveRight<S> :
-  Instr extends "<" ? MoveLeft<S>  :
-  Instr extends "." ? Print<S>     :
-  Instr extends "[" ? StartLoop<S> : 
-  Instr extends "]" ? EndLoop<S>   : 
-  Next<S>;
-
 type StartState = {
   tape: [0, 0, 0];
   dataPtr: 0;
@@ -125,33 +124,44 @@ type StrSplice<Str extends string,
     : StrSplice<Rest, Index, Inc<CurrIndex>>
   : "";
 
-type Interpret2<
+type _Interpret<
   Code extends string,
   S extends State = StartState,
   FullCode extends string = Code
 > =
-  Code extends `+${infer Rest}` ? Interpret2<Rest, Increment<S>> : 
-  Code extends `-${infer Rest}` ? Interpret2<Rest, Decrement<S>> :
-  Code extends `>${infer Rest}` ? Interpret2<Rest, MoveRight<S>> :
-  Code extends `<${infer Rest}` ? Interpret2<Rest, MoveRight<S>> :
-  Code extends `.${infer Rest}` ? Interpret2<Rest, Print<S>>     :
-  Code extends `[${infer Rest}` ? Interpret2<Rest, StartLoop<S>> :
+  Code extends `+${infer Rest}` ? _Interpret<Rest, Increment<S>> : 
+  Code extends `-${infer Rest}` ? _Interpret<Rest, Decrement<S>> :
+  Code extends `>${infer Rest}` ? _Interpret<Rest, MoveRight<S>> :
+  // @ts-ignore: The TS compiler will complain about excessive stack depth
+  // when evaluating the "MoveLeft" type level function, but we can get it
+  // to work anyway with the ts-ignore directive.
+  Code extends `<${infer Rest}` ? _Interpret<Rest, MoveLeft<S>>  :
+  Code extends `.${infer Rest}` ? _Interpret<Rest, Print<S>>     :
+  Code extends `[${infer Rest}` ? _Interpret<Rest, StartLoop<S>> :
   Code extends `]${infer Rest}` ? 
-    S["dataPtr"] extends 0 
+    S["tape"][S["dataPtr"]] extends 0 
       ? Head<S["loopStack"]> extends infer OldPtr extends number
-         ? Interpret2<StrSplice<FullCode, OldPtr>, Omit<S, "codePtr"> & { codePtr: Inc<OldPtr> }>
+         ? _Interpret<StrSplice<FullCode, OldPtr>,
+                      Omit<S, "codePtr"> & { codePtr: Inc<OldPtr> },
+                      FullCode>
          : "Encountered an error"
 
-      : Interpret2<Rest, Omit<Next<S>, "loopStack"> & { loopStack: Tail<S["loopStack"]> }> 
+      : _Interpret<Rest,
+                   Omit<Next<S>, "loopStack"> & { loopStack: Tail<S["loopStack"]> },
+                   FullCode> 
   : S;
 
+// Start with the memory tape initialized to [tape], and
+// Interpret the BrainFuck program [Code].
 export type Interpret<
   Code extends string,
   tape extends Tape = ZeroedTape
-> = Interpret2<
+> = _Interpret<
   Code,
   { tape: tape; dataPtr: 0; output: ""; loopStack: []; codePtr: 0 }
 >;
 
-export type _$ = Interpret<"+++++++.>+++.[-].">;
+export type __$ = Interpret<"++[">
+export type _$ = Interpret<"++[-].">["tape"];
+
 
