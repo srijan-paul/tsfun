@@ -1,5 +1,5 @@
 import { AsNum, Dec, Inc } from "./arith";
-import { Head, SplitAt, Tail } from "./util";
+import { AsciiMap, Head, SplitAt, Tail } from "./util";
 
 type Tape = [number, number, number];
 type ZeroedTape = [0, 0, 0];
@@ -85,7 +85,7 @@ type MoveLeft<S extends State> = {
 type Print<S extends State> = {
   tape: S["tape"];
   dataPtr: S["dataPtr"];
-  output: `${S["output"]}${S["tape"][S["dataPtr"]]}`;
+  output: `${S["output"]}${AsciiMap[S["tape"][S["dataPtr"]]]}`;
   loopStack: S["loopStack"];
   codePtr: Inc<S["codePtr"]>;
 };
