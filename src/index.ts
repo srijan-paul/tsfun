@@ -35,6 +35,8 @@ type DecAt<_Tape extends Tape, Index extends number> = SplitAt<
     : ZeroedTape
   : ZeroedTape;
 
+// Type definition for a type-level object
+// to track the current state of our computation
 type State = {
   // The memory tape
   tape: Tape;
@@ -54,26 +56,32 @@ type State = {
   loopStack: number[];
 };
 
+// nextState = { ...oldState, codePtr: oldState.codePTr + 1 }
 type Next<S extends State> = {
   codePtr: Inc<S["codePtr"]>;
 } & Omit<S, "codePtr">;
 
+// nextState = { ...next(state), tape: incAt(state.tape, state.dataPtr) }
 type Increment<S extends State> = {
   tape: IncAt<S["tape"], S["dataPtr"]>;
 } & Omit<Next<S>, "tape">;
 
+// nextState = { ...next(state), tape: decAt(state.tape, state.dataPtr) }
 type Decrement<S extends State> = {
   tape: DecAt<S["tape"], S["dataPtr"]>;
 } & Omit<Next<S>, "tape">;
 
+// nextState = { ...next(state), dataPtr: state.dataPtr + 1 }
 type MoveRight<S extends State> = {
   dataPtr: Inc<S["dataPtr"]>;
 } & Omit<Next<S>, "dataPtr">;
 
+// nextState = { ...next(state), dataPtr: state.dataPtr - 1 }
 type MoveLeft<S extends State> = {
   dataPtr: Dec<S["dataPtr"]>;
 } & Omit<Next<S>, "dataPtr">;
 
+// nextState = { ...next(state), output: state.output + state.tape[state.dataPtr] }
 type Print<S extends State> = {
   tape: S["tape"];
   dataPtr: S["dataPtr"];
@@ -82,6 +90,7 @@ type Print<S extends State> = {
   codePtr: Inc<S["codePtr"]>;
 };
 
+// nextState = { ...next(state), codePtr: state.codePtr + 1, loopStack: [state.codePtr, ...state.loopStack]
 type StartLoop<S extends State> = {
   tape: S["tape"];
   dataPtr: S["dataPtr"];
@@ -121,16 +130,24 @@ type _Interpret<
   Code extends `<${infer Rest}` ? _Interpret<Rest, MoveLeft<S>, FullCode>  :
   Code extends `.${infer Rest}` ? _Interpret<Rest, Print<S>, FullCode>     :
   Code extends `[${infer Rest}` ? _Interpret<Rest, StartLoop<S>, FullCode> :
-  Code extends `]${infer Rest}` ?  
+  Code extends `]${infer Rest}` ?
+    // if tape[dataPtr] == 0
     S["tape"][S["dataPtr"]] extends 0 
+        // state.loopStack.pop();
+        // return interpret(rest, next(state))
       ? _Interpret<Rest,
                    Omit<Next<S>, "loopStack"> & { loopStack: Tail<S["loopStack"]> },
                    FullCode>
-
+      // oldPtr = loopStack[0]
+      // if (typeof oldPtr === "number")
       : Head<S["loopStack"]> extends infer OldPtr extends number
+        // code = fullCode.substring(oldPtr, fullCode.length)
+        // state.codePtr = oldPtr + 1
+        // return interpret(code, state)
         ? _Interpret<StrSplice<FullCode, OldPtr>,
                            Omit<S, "codePtr"> & { codePtr: Inc<OldPtr> },
                            FullCode>
+        // else return new Error("Encountered an error")
         : "Encountered an error"
 
   : S;
@@ -153,5 +170,5 @@ export type Interpret<
   { tape: tape; dataPtr: 0; output: ""; loopStack: []; codePtr: 0 }
 > >;
 
-export type _$ = Interpret<">[-<+>]", [3, 1, 0]>;
+export type _$ = Interpret<">[-<+>]", [40, 50, 0]>;
 
