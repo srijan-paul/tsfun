@@ -10,7 +10,6 @@ export type MkTup<N extends number, A extends unknown[] = []> = TupLen<A> extend
   ? A
   : MkTup<N, [...A, 0]>;
 
-
 export type If<Cond, Then, Else> =
     Cond extends true ? Then : Else;
 

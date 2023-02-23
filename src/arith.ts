@@ -23,13 +23,15 @@ export type Gt_<A extends unknown[], B extends unknown[]> =
 
 export type Gt<A extends number, B extends number> = Gt_<N<A>, N<B>>;
 
+
+
+
+
+
 export type Fib<Num extends number> =
   Num extends 0 | 1 ? Num :
   // @ts-ignore
   Add<Fib<Dec<Num>>, Num>
-
-
-
 
 export type AsNum<M> = M extends number ? M : 0;
 export type Inc<A extends number> = AsNum<Add<A, 1>>

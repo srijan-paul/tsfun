@@ -148,8 +148,10 @@ type _Interpret<
                            Omit<S, "codePtr"> & { codePtr: Inc<OldPtr> },
                            FullCode>
         // else return new Error("Encountered an error")
-        : "Encountered an error"
+        : "Encountered an error" :
 
+  Code extends "" ? S : 
+  Code extends `${infer _}${infer Rest}` ? _Interpret<Rest, S, FullCode>
   : S;
   
 
@@ -170,5 +172,5 @@ export type Interpret<
   { tape: tape; dataPtr: 0; output: ""; loopStack: []; codePtr: 0 }
 > >;
 
-export type _$ = Interpret<">[-<+>]", [40, 50, 0]>;
+export type _$ = Interpret<'[->+<]', [30, 40, 0]>;
 
